@@ -1,0 +1,119 @@
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+
+http:
+  routers:
+    firewall:
+      entryPoints:
+        - "https"
+      rule: "Host(`fw.local.zech.co`)"
+      middlewares:
+        - default-headers
+        - https-redirectscheme
+      tls: {}
+      service: firewall
+    nas:
+      entryPoints:
+        - "https"
+      rule: "Host(`nas.local.zech.co`)"
+      middlewares:
+        - default-headers
+        - https-redirectscheme
+      tls: {}
+      service: nas
+    checkmk:
+      entryPoints:
+        - "https"
+      rule: "Host(`monitoring.zech.co`)"
+      middlewares:
+        - default-headers
+        - https-redirectscheme
+        - checkmk-addprefix
+      tls: {}
+      service: checkmk
+    home-assistant:
+      entryPoints:
+        - "https"
+      rule: "Host(`home.zech.co`)"
+      middlewares:
+        - default-headers
+        - https-redirectscheme
+      tls: {}
+      service: home-assistant
+
+  services:
+    firewall:
+      loadBalancer:
+        servers:
+          - url: "https://10.0.1.1:4444"
+        passHostHeader: true
+    nas:
+      loadBalancer:
+        servers:
+          - url: "https://10.0.1.30"
+        passHostHeader: true
+    checkmk:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.10.110"
+        passHostHeader: true
+    home-assistant:
+      loadBalancer:
+        servers:
+          - url: "http://10.0.10.120:8123"
+        passHostHeader: true
+
+  middlewares:
+    https-redirectscheme:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    authentik:
+      forwardauth:
+        address: http://authentik-server:9000/outpost.goauthentik.io/auth/traefik
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-authentik-username
+          - X-authentik-groups
+          - X-authentik-email
+          - X-authentik-name
+          - X-authentik-uid
+          - X-authentik-jwt
+          - X-authentik-meta-jwks
+          - X-authentik-meta-outpost
+          - X-authentik-meta-provider
+          - X-authentik-meta-app
+          - X-authentik-meta-version      
+    default-headers:
+      headers:
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 15552000
+        customFrameOptionsValue: SAMEORIGIN
+        contentSecurityPolicy: upgrade-insecure-requests
+        referrerPolicy: no-referrer-when-downgrade
+        permissionsPolicy: interest-cohort=()
+        customRequestHeaders:
+          X-Forwarded-Proto: https
+    checkmk-addprefix:
+      addPrefix:
+        prefix: "/monitoring"
+    secured:
+      chain:
+        middlewares:
+        - default-headers
+        - authentik

@@ -1,0 +1,31 @@
+version: "3"
+
+services:
+  home-assistant:
+    container_name: home-assistant
+    image: homeassistant/home-assistant
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Vienna
+    labels:
+      traefik.enable: true
+      traefik.http.routers.home-assistant.entrypoints: http
+      traefik.http.routers.home-assistant.rule: Host(`home.${DOMAIN_NAME}`)
+      traefik.http.middlewares.home-assistant-https-redirect.redirectscheme.scheme: https
+      traefik.http.routers.home-assistant.middlewares: home-assistant-https-redirect
+      traefik.http.routers.home-assistant-secure.entrypoints: https
+      traefik.http.routers.home-assistant-secure.rule: Host(`home.${DOMAIN_NAME}`)
+      traefik.http.routers.home-assistant-secure.tls: true
+      traefik.http.routers.home-assistant-secure.middlewares: default-headers@file
+      traefik.http.routers.home-assistant-secure.service: home-assistant
+      traefik.http.services.home-assistant.loadbalancer.server.scheme: https
+      traefik.http.services.home-assistant.loadbalancer.server.port: 8123
+      traefik.docker.network: proxy
+    volumes:
+      - ./home-assistant/config:/config
+    networks:
+      - proxy
+
+networks:
+  proxy: 
+    external: true
